@@ -1,0 +1,6 @@
+<resources>
+    <color name="rw_bg">#050505</color>
+    <color name="rw_card">#141414</color>
+    <color name="rw_text">#F6F6F6</color>
+    <color name="rw_accent">#24C8FF</color>
+</resources>

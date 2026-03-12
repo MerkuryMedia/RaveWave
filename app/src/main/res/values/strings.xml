@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">RaveWave</string>
+    <string name="source_mic">Microphone</string>
+    <string name="source_file">File</string>
+    <string name="source_capture">Playback Capture</string>
+    <string name="play_pause">Play/Pause</string>
+    <string name="cast">Cast</string>
+    <string name="external_display">External Display</string>
+    <string name="fullscreen">Fullscreen</string>
+    <string name="hide_menu">Hide Menu</string>
+    <string name="show_menu">Show Menu</string>
+    <string name="cast_receiver_app_id">CC1AD845</string>
+</resources>
