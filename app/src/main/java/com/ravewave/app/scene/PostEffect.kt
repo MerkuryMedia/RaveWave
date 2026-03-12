@@ -18,5 +18,11 @@ enum class PostEffect(val displayName: String, val index: Int) {
     BLOOM_GLOW("Bloom Glow", 14),
     PRISM_SHIFT("Prism Shift", 15),
     SOLAR_BURST("Solar Burst", 16),
-    SACRED_GRID("Sacred Grid", 17)
+    SACRED_GRID("Sacred Grid", 17),
+    NITROUS("Nitrous", 18),
+    CYCLONE("Cyclone", 19),
+    NEON("Neon", 20),
+    X_RAY("X-Ray", 21),
+    HYPERSPACE("Hyperspace", 22),
+    BOUNCE("Bounce", 23)
 }

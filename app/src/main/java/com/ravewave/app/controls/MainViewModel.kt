@@ -100,6 +100,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         app.sceneRepository.setFxIntensity(progress0to100 / 100f)
     }
 
+    fun setSpeed(progress0to100: Int) {
+        app.sceneRepository.setSpeed(progress0to100 / 100f)
+    }
+
     fun setTileCount(progress: Int) {
         app.sceneRepository.setTileCount(progress + 2)
     }

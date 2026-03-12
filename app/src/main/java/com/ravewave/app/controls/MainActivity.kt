@@ -184,6 +184,10 @@ class MainActivity : AppCompatActivity() {
             viewModel.setFxIntensity(value)
         })
 
+        binding.speedSeek.setOnSeekBarChangeListener(SimpleSeekListener { value ->
+            viewModel.setSpeed(value)
+        })
+
         binding.tileSeek.setOnSeekBarChangeListener(SimpleSeekListener { value ->
             viewModel.setTileCount(value)
         })
@@ -279,6 +283,11 @@ class MainActivity : AppCompatActivity() {
         val intensity = (ui.scene.fxIntensity * 100f).toInt().coerceIn(0, 100)
         if (binding.intensitySeek.progress != intensity) {
             binding.intensitySeek.progress = intensity
+        }
+
+        val speed = (ui.scene.speed * 100f).toInt().coerceIn(0, 100)
+        if (binding.speedSeek.progress != speed) {
+            binding.speedSeek.progress = speed
         }
 
         val tileProgress = (ui.scene.tileCount - 2).coerceIn(0, 4)

@@ -401,6 +401,16 @@ export default function App() {
               maximumTrackTintColor="#3b3b3b"
             />
 
+            <Text style={styles.label}>Speed {Math.round(scene.speed * 100)}</Text>
+            <Slider
+              value={scene.speed}
+              minimumValue={0}
+              maximumValue={1}
+              onValueChange={(v) => setScene((prev) => ({ ...prev, speed: v }))}
+              minimumTrackTintColor="#1ec9ff"
+              maximumTrackTintColor="#3b3b3b"
+            />
+
             <Text style={styles.label}>Tile Count {scene.tileCount}</Text>
             <Slider
               value={scene.tileCount}

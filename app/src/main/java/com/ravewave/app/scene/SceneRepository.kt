@@ -33,6 +33,10 @@ class SceneRepository(context: Context) {
         _state.value = _state.value.copy(fxIntensity = value.coerceIn(0f, 1f))
     }
 
+    fun setSpeed(value: Float) {
+        _state.value = _state.value.copy(speed = value.coerceIn(0f, 1f))
+    }
+
     fun setTileCount(value: Int) {
         _state.value = _state.value.copy(tileCount = value.coerceIn(2, 6))
     }
@@ -93,6 +97,7 @@ private class PresetStore(context: Context) {
         root.put("layers", JSONArray(state.enabledLayers.map { it.name }))
         root.put("effects", JSONArray(state.enabledEffects.map { it.name }))
         root.put("fxIntensity", state.fxIntensity.toDouble())
+        root.put("speed", state.speed.toDouble())
         root.put("tileCount", state.tileCount)
         root.put("symmetrySegments", state.symmetrySegments)
         root.put("sourceMode", state.sourceMode.name)
@@ -124,6 +129,7 @@ private class PresetStore(context: Context) {
             enabledLayers = if (layers.isEmpty()) setOf(VisualLayer.SPECTRUM) else layers,
             enabledEffects = effects,
             fxIntensity = root.optDouble("fxIntensity", 0.6).toFloat(),
+            speed = root.optDouble("speed", 0.6).toFloat(),
             tileCount = root.optInt("tileCount", 3),
             symmetrySegments = root.optInt("symmetrySegments", 6),
             sourceMode = SourceMode.entries.firstOrNull {

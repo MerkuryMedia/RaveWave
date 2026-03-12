@@ -26,8 +26,8 @@ export type DisplayFramePayload = {
     enabledLayers: string[];
     enabledEffects: string[];
     fxIntensity: number;
+    speed: number;
     tileCount: number;
     symmetrySegments: number;
   };
 };
-

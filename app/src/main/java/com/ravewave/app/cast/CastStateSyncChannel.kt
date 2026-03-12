@@ -15,6 +15,7 @@ class CastStateSyncChannel(
             .put("layers", sceneState.enabledLayers.map { it.name })
             .put("effects", sceneState.enabledEffects.map { it.name })
             .put("fxIntensity", sceneState.fxIntensity)
+            .put("speed", sceneState.speed)
             .put("tileCount", sceneState.tileCount)
             .put("symmetrySegments", sceneState.symmetrySegments)
             .toString()

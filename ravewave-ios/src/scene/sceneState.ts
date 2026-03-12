@@ -57,6 +57,12 @@ export const PostEffects = [
   'Prism Shift',
   'Solar Burst',
   'Sacred Grid',
+  'Nitrous',
+  'Cyclone',
+  'Neon',
+  'X-Ray',
+  'Hyperspace',
+  'Bounce',
 ] as const;
 
 export type PostEffect = (typeof PostEffects)[number];
@@ -66,6 +72,7 @@ export type SceneState = {
   enabledLayers: Set<VisualLayer>;
   enabledEffects: Set<PostEffect>;
   fxIntensity: number;
+  speed: number;
   tileCount: number;
   symmetrySegments: number;
   menuHidden: boolean;
@@ -80,6 +87,7 @@ export const defaultSceneState = (): SceneState => ({
   enabledLayers: new Set<VisualLayer>(['Spectrum', 'Waveform']),
   enabledEffects: new Set<PostEffect>(['Bloom Glow']),
   fxIntensity: 0.6,
+  speed: 0.6,
   tileCount: 3,
   symmetrySegments: 6,
   menuHidden: false,
@@ -95,6 +103,7 @@ export type PersistedPreset = {
   enabledLayers: VisualLayer[];
   enabledEffects: PostEffect[];
   fxIntensity: number;
+  speed: number;
   tileCount: number;
   symmetrySegments: number;
 };
@@ -105,6 +114,7 @@ export const toPersistedPreset = (name: string, scene: SceneState): PersistedPre
   enabledLayers: [...scene.enabledLayers],
   enabledEffects: [...scene.enabledEffects],
   fxIntensity: scene.fxIntensity,
+  speed: scene.speed,
   tileCount: scene.tileCount,
   symmetrySegments: scene.symmetrySegments,
 });
@@ -115,6 +125,7 @@ export const fromPersistedPreset = (preset: PersistedPreset): SceneState => ({
   enabledLayers: new Set(preset.enabledLayers),
   enabledEffects: new Set(preset.enabledEffects),
   fxIntensity: preset.fxIntensity,
+  speed: preset.speed ?? 0.6,
   tileCount: preset.tileCount,
   symmetrySegments: preset.symmetrySegments,
 });

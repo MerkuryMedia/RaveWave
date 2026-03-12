@@ -164,6 +164,7 @@ export class DisplaySessionManager {
         enabledLayers: [...scene.enabledLayers],
         enabledEffects: [...scene.enabledEffects],
         fxIntensity: scene.fxIntensity,
+        speed: scene.speed,
         tileCount: scene.tileCount,
         symmetrySegments: scene.symmetrySegments,
       },
@@ -184,4 +185,3 @@ export class DisplaySessionManager {
     this.onState(next);
   }
 }
-
