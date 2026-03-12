@@ -3,6 +3,7 @@ package com.ravewave.app.scene
 data class SceneState(
     val enabledLayers: Set<VisualLayer> = setOf(VisualLayer.SPECTRUM),
     val enabledEffects: Set<PostEffect> = emptySet(),
+    val colorMode: ColorMode = ColorMode.RAINBOW,
     val fxIntensity: Float = 0.6f,
     val speed: Float = 0.6f,
     val tileCount: Int = 3,

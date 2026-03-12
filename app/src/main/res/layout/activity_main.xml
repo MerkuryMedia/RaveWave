@@ -11,16 +11,32 @@
         android:id="@+id/renderHost"
         android:layout_width="match_parent"
         android:layout_height="@dimen/preview_height"
-        android:background="#000000" />
+        android:background="#000000">
 
-    <Button
-        android:id="@+id/showMenuButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:layout_margin="8dp"
-        android:text="@string/show_menu"
-        android:visibility="gone" />
+        <ImageButton
+            android:id="@+id/castOverlayButton"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="14dp"
+            android:background="@android:color/transparent"
+            android:backgroundTint="#B0000000"
+            android:padding="10dp"
+            android:src="@drawable/ic_cast_overlay"
+            android:tint="#FFFFFF"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/fullscreenOverlayButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="14dp"
+            android:backgroundTint="#B0000000"
+            android:text="Fullscreen"
+            android:textColor="#FFFFFF"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <ScrollView
         android:id="@+id/controlsScroll"
@@ -89,46 +105,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:text="@string/play_pause" />
-                </LinearLayout>
-            </HorizontalScrollView>
-
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/fullscreenButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/fullscreen" />
-
-                    <Button
-                        android:id="@+id/externalButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="@string/external_display" />
-
-                    <Button
-                        android:id="@+id/castButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="@string/cast" />
-
-                    <Button
-                        android:id="@+id/hideMenuButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="@string/hide_menu" />
                 </LinearLayout>
             </HorizontalScrollView>
 
@@ -201,35 +177,38 @@
                 android:max="8"
                 android:progress="2" />
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Colorize"
+                android:textColor="@color/rw_text"
+                android:textStyle="bold" />
+
+            <RadioGroup
+                android:id="@+id/colorModeGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="10dp"
                 android:orientation="horizontal">
 
-                <EditText
-                    android:id="@+id/presetNameInput"
-                    android:layout_width="0dp"
+                <Button
+                    android:id="@+id/randomizeButton"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="Preset name"
-                    android:inputType="text"
-                    android:textColor="@color/rw_text"
-                    android:textColorHint="#88FFFFFF" />
+                    android:text="Randomize" />
 
                 <Button
-                    android:id="@+id/savePresetButton"
+                    android:id="@+id/evolveButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:text="Save" />
-
-                <Button
-                    android:id="@+id/loadPresetButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="Load" />
+                    android:text="Evolve: Off" />
             </LinearLayout>
 
             <TextView

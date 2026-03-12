@@ -5,6 +5,7 @@ import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import com.ravewave.app.analyzer.AnalyzerMetrics
 import com.ravewave.app.analyzer.AudioAnalyzerEngine
+import com.ravewave.app.scene.ColorMode
 import com.ravewave.app.scene.PostEffect
 import com.ravewave.app.scene.SceneState
 import com.ravewave.app.scene.VisualLayer
@@ -71,6 +72,7 @@ class VisualizerRenderer(
     private var postUTime = -1
     private var postUResolution = -1
     private var postUFxIntensity = -1
+    private var postUColorMode = -1
     private var postUSpeed = -1
     private var postUTileCount = -1
     private var postUSymmetry = -1
@@ -121,6 +123,7 @@ class VisualizerRenderer(
         postUTime = GLES30.glGetUniformLocation(postProgram, "uTime")
         postUResolution = GLES30.glGetUniformLocation(postProgram, "uResolution")
         postUFxIntensity = GLES30.glGetUniformLocation(postProgram, "uFxIntensity")
+        postUColorMode = GLES30.glGetUniformLocation(postProgram, "uColorMode")
         postUSpeed = GLES30.glGetUniformLocation(postProgram, "uSpeed")
         postUTileCount = GLES30.glGetUniformLocation(postProgram, "uTileCount")
         postUSymmetry = GLES30.glGetUniformLocation(postProgram, "uSymmetry")
@@ -214,6 +217,7 @@ class VisualizerRenderer(
         GLES30.glUniform1f(postUTime, time)
         GLES30.glUniform2f(postUResolution, width.toFloat(), height.toFloat())
         GLES30.glUniform1f(postUFxIntensity, state.fxIntensity)
+        GLES30.glUniform1f(postUColorMode, state.colorMode.index.toFloat())
         GLES30.glUniform1f(postUSpeed, state.speed)
         GLES30.glUniform1f(postUTileCount, state.tileCount.toFloat())
         GLES30.glUniform1f(postUSymmetry, state.symmetrySegments.toFloat())
@@ -729,10 +733,11 @@ class VisualizerRenderer(
             uniform vec4 uPulse;
             uniform float uTime;
             uniform float uFxIntensity;
+            uniform float uColorMode;
             uniform float uSpeed;
             uniform float uTileCount;
             uniform float uSymmetry;
-            uniform float uEffectEnabled[24];
+            uniform float uEffectEnabled[25];
 
             const float PI = 3.141592653589793;
             const float TAU = 6.283185307179586;
@@ -745,6 +750,51 @@ class VisualizerRenderer(
 
             vec3 sampleScene(vec2 uv) {
                 return texture(uSceneTex, clamp(uv, 0.0, 1.0)).rgb;
+            }
+
+            vec3 palette(float t) {
+                vec3 a = vec3(0.55, 0.50, 0.52);
+                vec3 b = vec3(0.45, 0.28, 0.40);
+                vec3 c = vec3(1.00, 0.85, 0.65);
+                vec3 d = vec3(0.05, 0.18, 0.33);
+                return a + b * cos(TAU * (c * t + d));
+            }
+
+            vec3 toneMap(float lum, vec3 a, vec3 b) {
+                return mix(a, b, smoothstep(0.02, 0.98, lum));
+            }
+
+            vec3 applyColorMode(vec3 color, float mode, float radius, float ang, float time) {
+                float lum = clamp(dot(color, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+                vec3 gray = vec3(pow(lum, 0.95));
+                float mask = smoothstep(0.015, 0.12, lum);
+                if (mask <= 0.0) return color;
+
+                vec3 tinted;
+                if (mode < 0.5) tinted = toneMap(lum, vec3(0.02, 0.08, 0.22), vec3(0.45, 0.78, 1.0));
+                else if (mode < 1.5) tinted = toneMap(lum, vec3(0.02, 0.16, 0.08), vec3(0.58, 1.0, 0.42));
+                else if (mode < 2.5) tinted = toneMap(lum, vec3(0.26, 0.16, 0.02), vec3(1.0, 0.9, 0.3));
+                else if (mode < 3.5) tinted = toneMap(lum, vec3(0.22, 0.03, 0.03), vec3(1.0, 0.34, 0.26));
+                else if (mode < 4.5) tinted = toneMap(lum, vec3(0.12, 0.03, 0.18), vec3(0.88, 0.4, 1.0));
+                else if (mode < 5.5) {
+                    float cycle = mod(time * 0.22, 4.0);
+                    vec3 colorA = cycle < 1.0 ? vec3(0.0, 0.92, 1.0)
+                        : cycle < 2.0 ? vec3(1.0, 0.82, 0.24)
+                        : cycle < 3.0 ? vec3(0.9, 0.28, 1.0)
+                        : vec3(1.0, 0.28, 0.36);
+                    vec3 colorB = cycle < 1.0 ? vec3(1.0, 0.24, 0.72)
+                        : cycle < 2.0 ? vec3(0.18, 1.0, 0.52)
+                        : cycle < 3.0 ? vec3(0.16, 0.82, 1.0)
+                        : vec3(1.0, 0.94, 0.32);
+                    float split = smoothstep(0.15, 0.9, lum + sin(time * 0.8 + radius * 8.0 + ang * 2.0) * 0.08);
+                    tinted = mix(colorA, colorB, split) * (0.3 + lum * 0.95);
+                } else if (mode < 6.5) {
+                    vec3 rainbow = palette(lum * 0.9 + radius * 0.2 + ang / TAU * 0.3 - time * 0.04);
+                    tinted = mix(color, rainbow * (0.25 + lum * 0.8), 0.42);
+                } else {
+                    tinted = gray * 1.15;
+                }
+                return mix(color, tinted, mask);
             }
 
             float hash21(vec2 p) {
@@ -763,6 +813,8 @@ class VisualizerRenderer(
                 float coverScale = 1.0;
                 float fxSpeed = mix(0.45, 2.8, uSpeed);
                 float bounceLift = 0.0;
+                float tunnelPhase = 0.0;
+                float tunnelScale = 1.0;
 
                 vec2 q = vUv - 0.5;
                 q.x *= uResolution.x / max(uResolution.y, 1.0);
@@ -790,6 +842,11 @@ class VisualizerRenderer(
                     bounceLift = bouncePulse * (0.08 + uFxIntensity * 0.16) - uPulse.w * (0.03 + uFxIntensity * 0.04);
                     zoom += bouncePulse * (0.04 + uFxIntensity * 0.06);
                 }
+                if (uEffectEnabled[24] > 0.5) {
+                    tunnelPhase = fract(uTime * (0.22 + beat * 0.05 + uFxIntensity * 0.08) * fxSpeed);
+                    tunnelScale = exp2(tunnelPhase * (1.5 + uFxIntensity * 1.9));
+                    zoom += 0.12 + uFxIntensity * 0.18;
+                }
 
                 float angle = 0.0;
                 if (uEffectEnabled[2] > 0.5) {
@@ -797,6 +854,9 @@ class VisualizerRenderer(
                 }
                 if (uEffectEnabled[19] > 0.5) {
                     angle += (uTime * 2.9 * fxSpeed + energy * 0.35) * (0.9 + uFxIntensity * 0.95);
+                }
+                if (uEffectEnabled[24] > 0.5) {
+                    angle += tunnelPhase * (0.16 + uFxIntensity * 0.28) + length(q) * 0.22;
                 }
 
                 q = rot(angle) * q;
@@ -825,6 +885,7 @@ class VisualizerRenderer(
                 if (uEffectEnabled[18] > 0.5) coverScale = min(coverScale, 0.64);
                 if (uEffectEnabled[19] > 0.5) coverScale = min(coverScale, 0.56);
                 if (uEffectEnabled[23] > 0.5) coverScale = min(coverScale, 0.68);
+                if (uEffectEnabled[24] > 0.5) coverScale = min(coverScale, 0.5);
                 q *= coverScale;
 
                 vec2 sampleUv = vec2(
@@ -839,6 +900,10 @@ class VisualizerRenderer(
                 if (uEffectEnabled[8] > 0.5) {
                     float px = mix(240.0, 84.0, clamp(uFxIntensity, 0.0, 1.0));
                     sampleUv = floor(sampleUv * px) / px;
+                }
+
+                if (uEffectEnabled[24] > 0.5) {
+                    sampleUv = fract((sampleUv - 0.5) * tunnelScale + 0.5);
                 }
 
                 vec3 color;
@@ -965,6 +1030,7 @@ class VisualizerRenderer(
                     color = xray * edge;
                 }
 
+                color = applyColorMode(color, uColorMode, length(q), atan(q.y, q.x), uTime);
                 float dust = pow(hash21(floor(vUv * uResolution * 0.5) + floor(uTime * 24.0)), 24.0);
                 color += vec3(1.0) * dust * onset * 0.08;
                 fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);

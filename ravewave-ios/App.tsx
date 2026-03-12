@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useCallback } from 'react';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +21,14 @@ import { DisplaySessionManager } from './src/display/DisplaySessionManager';
 import { DisplaySessionState } from './src/display/types';
 import VisualizerCanvas from './src/render/VisualizerCanvas';
 import {
+  createEvolvePulseState,
+  evolveSceneWithAudio,
+  nextEvolveDelayMs,
+  randomizeScene,
+} from './src/scene/sceneRandomizer';
+import {
+  ColorMode,
+  ColorModes,
   defaultSceneState,
   fromPersistedPreset,
   PersistedPreset,
@@ -70,6 +80,40 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </View>
 );
 
+const CastScreenIcon = () => (
+  <View style={styles.castIconFrame}>
+    <View style={styles.castIconBox} />
+    <View style={styles.castIconWaveOuter} />
+    <View style={styles.castIconWaveInner} />
+    <View style={styles.castIconDot} />
+  </View>
+);
+
+const SegmentedOptionRow = ({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly string[];
+  value: string;
+  onChange: (next: string) => void;
+}) => (
+  <View style={styles.optionWrap}>
+    {options.map((option) => {
+      const selected = option === value;
+      return (
+        <Pressable
+          key={option}
+          style={[styles.optionChip, selected && styles.optionChipSelected]}
+          onPress={() => onChange(option)}
+        >
+          <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option}</Text>
+        </Pressable>
+      );
+    })}
+  </View>
+);
+
 const VisualizerSurface = React.memo(function VisualizerSurface({
   analyzerRef,
   scene,
@@ -97,9 +141,15 @@ export default function App() {
   const [presetName, setPresetName] = useState('');
   const [presetNames, setPresetNames] = useState<string[]>([]);
   const [displayState, setDisplayState] = useState<DisplaySessionState>(DEFAULT_DISPLAY_STATE);
+  const [isEvolving, setIsEvolving] = useState(false);
+  const [showVisualControls, setShowVisualControls] = useState(false);
+  const [showCastOverlay, setShowCastOverlay] = useState(false);
 
   const analyzerRef = useRef<AnalyzerEngine>(new AnalyzerEngine());
   const sceneRef = useRef<SceneState>(scene);
+  const evolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const evolvePulseRef = useRef(createEvolvePulseState());
+  const visualControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sourceManagerRef = useRef<AudioSourceManager | null>(null);
   const displayManagerRef = useRef<DisplaySessionManager | null>(null);
@@ -107,6 +157,23 @@ export default function App() {
   useEffect(() => {
     sceneRef.current = scene;
   }, [scene]);
+
+  const clearEvolveTimer = useCallback(() => {
+    if (evolveTimeoutRef.current !== null) {
+      clearTimeout(evolveTimeoutRef.current);
+      evolveTimeoutRef.current = null;
+    }
+  }, []);
+
+  const revealVisualControls = useCallback(() => {
+    if (visualControlsTimeoutRef.current !== null) {
+      clearTimeout(visualControlsTimeoutRef.current);
+    }
+    setShowVisualControls(true);
+    visualControlsTimeoutRef.current = setTimeout(() => {
+      setShowVisualControls(false);
+    }, 3200);
+  }, []);
 
   useEffect(() => {
     sourceManagerRef.current = new AudioSourceManager({
@@ -145,12 +212,16 @@ export default function App() {
     }, 40);
 
     return () => {
+      clearEvolveTimer();
+      if (visualControlsTimeoutRef.current !== null) {
+        clearTimeout(visualControlsTimeoutRef.current);
+      }
       clearInterval(displayTimer);
       displayManagerRef.current?.stopSession().catch(() => undefined);
       displayManagerRef.current?.dispose();
       sourceManagerRef.current?.stopAll().catch(() => undefined);
     };
-  }, []);
+  }, [clearEvolveTimer]);
 
   const loadPresets = async () => {
     const raw = await AsyncStorage.getItem(PRESET_KEY);
@@ -224,6 +295,32 @@ export default function App() {
     });
   };
 
+  const randomizeVisuals = useCallback(() => {
+    setScene((prev) => randomizeScene(prev));
+    setStatusText('Scene randomized.');
+  }, []);
+
+  useEffect(() => {
+    clearEvolveTimer();
+    if (!isEvolving) return undefined;
+
+    setScene((prev) => randomizeScene(prev));
+    setStatusText('Evolve enabled.');
+    evolvePulseRef.current = createEvolvePulseState();
+
+    const scheduleNext = () => {
+      const frame = analyzerRef.current.frame();
+      evolveTimeoutRef.current = setTimeout(() => {
+        const liveFrame = analyzerRef.current.frame();
+        setScene((prev) => evolveSceneWithAudio(prev, liveFrame, evolvePulseRef.current));
+        scheduleNext();
+      }, nextEvolveDelayMs(frame));
+    };
+
+    scheduleNext();
+    return clearEvolveTimer;
+  }, [clearEvolveTimer, isEvolving]);
+
   const selectMicrophone = async () => {
     await sourceManagerRef.current?.setMode(SourceMode.Microphone);
     setScene((prev) => ({ ...prev, sourceMode: SourceMode.Microphone }));
@@ -263,6 +360,7 @@ export default function App() {
 
   const stopExternalOutput = async () => {
     await displayManagerRef.current?.stopSession();
+    setShowCastOverlay(false);
     setScene((prev) => ({
       ...prev,
       externalOutputActive: false,
@@ -272,15 +370,7 @@ export default function App() {
     setStatusText('External output stopped.');
   };
 
-  const controlsHidden = !scene.externalOutputActive && (scene.menuHidden || scene.fullScreen);
-  const floatingButtonLabel = scene.fullScreen ? 'Exit Fullscreen' : 'Show Menu';
-  const onFloatingButtonPress = () => {
-    if (scene.fullScreen) {
-      setScene((prev) => ({ ...prev, fullScreen: false, menuHidden: false }));
-      return;
-    }
-    setScene((prev) => ({ ...prev, menuHidden: false }));
-  };
+  const controlsHidden = !scene.externalOutputActive && scene.fullScreen;
 
   const statusLine = useMemo(
     () =>
@@ -295,9 +385,34 @@ export default function App() {
       <StatusBar style="light" hidden={scene.fullScreen} />
 
       {!scene.externalOutputActive ? (
-        <View style={scene.fullScreen ? styles.visualFull : styles.visualWindowed}>
+        <Pressable
+          style={scene.fullScreen ? styles.visualFull : styles.visualWindowed}
+          onPress={revealVisualControls}
+        >
           <VisualizerSurface analyzerRef={analyzerRef} scene={scene} />
-        </View>
+          {showVisualControls ? (
+            <>
+              <Pressable
+                style={styles.castOverlayButton}
+                onPress={() => {
+                  revealVisualControls();
+                  setShowCastOverlay(true);
+                }}
+              >
+                <CastScreenIcon />
+              </Pressable>
+              <Pressable
+                style={styles.fullscreenOverlayButton}
+                onPress={() => {
+                  revealVisualControls();
+                  setScene((prev) => ({ ...prev, fullScreen: !prev.fullScreen, menuHidden: false }));
+                }}
+              >
+                <Text style={styles.overlayButtonText}>{scene.fullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </Pressable>
       ) : (
         <View style={styles.controllerModeBanner}>
           <Text style={styles.controllerModeTitle}>Controller Mode Active</Text>
@@ -329,65 +444,30 @@ export default function App() {
               <Pressable style={styles.btnSecondary} onPress={() => sourceManagerRef.current?.togglePlayPause()}>
                 <Text style={styles.btnText}>Play/Pause</Text>
               </Pressable>
-              <Pressable
-                style={styles.btnSecondary}
-                onPress={() => {
-                  if (scene.externalOutputActive) {
-                    Alert.alert('External output active', 'Fullscreen is disabled while controller mode is active.');
-                    return;
-                  }
-                  setScene((prev) => ({ ...prev, fullScreen: !prev.fullScreen }));
-                }}
-              >
-                <Text style={styles.btnText}>{scene.fullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</Text>
-              </Pressable>
-              <Pressable
-                style={styles.btnSecondary}
-                onPress={() => setScene((prev) => ({ ...prev, menuHidden: !prev.menuHidden }))}
-              >
-                <Text style={styles.btnText}>{scene.menuHidden ? 'Show Menu' : 'Hide Menu'}</Text>
-              </Pressable>
             </View>
 
             <Text style={styles.meta}>File: {fileName}</Text>
             <Text style={styles.meta}>Mode: {scene.sourceMode}</Text>
           </Section>
 
-          <Section title="External Display">
+          <Section title="Automation">
             <View style={styles.buttonRow}>
-              <Pressable style={styles.btn} onPress={chooseOutputRoute}>
-                <Text style={styles.btnText}>Choose Route</Text>
+              <Pressable style={styles.btn} onPress={randomizeVisuals}>
+                <Text style={styles.btnText}>Randomize</Text>
               </Pressable>
-              <Pressable style={styles.btn} onPress={startExternalOutput}>
-                <Text style={styles.btnText}>Start External</Text>
-              </Pressable>
-              <Pressable style={styles.btnSecondary} onPress={stopExternalOutput}>
-                <Text style={styles.btnText}>Stop External</Text>
+              <Pressable
+                style={isEvolving ? styles.btnSecondaryActive : styles.btnSecondary}
+                onPress={() => {
+                  setIsEvolving((prev) => {
+                    const next = !prev;
+                    if (!next) setStatusText('Evolve disabled.');
+                    return next;
+                  });
+                }}
+              >
+                <Text style={styles.btnText}>{isEvolving ? 'Evolve: On' : 'Evolve: Off'}</Text>
               </Pressable>
             </View>
-            <Text style={styles.meta}>Connected: {displayState.connected ? 'Yes' : 'No'}</Text>
-            <Text style={styles.meta}>Controller Mode: {displayState.controllerOnlyMode ? 'Active' : 'Off'}</Text>
-            <Text style={styles.meta}>Route: {displayState.routeName ?? 'None'}</Text>
-            <Text style={styles.meta}>Status: {displayState.message}</Text>
-          </Section>
-
-          <Section title="Preset">
-            <TextInput
-              value={presetName}
-              onChangeText={setPresetName}
-              placeholder="Preset name"
-              placeholderTextColor="#8b8b8b"
-              style={styles.input}
-            />
-            <View style={styles.buttonRow}>
-              <Pressable style={styles.btn} onPress={savePreset}>
-                <Text style={styles.btnText}>Save Preset</Text>
-              </Pressable>
-              <Pressable style={styles.btn} onPress={loadPreset}>
-                <Text style={styles.btnText}>Load Preset</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.meta}>Saved: {presetNames.join(', ') || 'none'}</Text>
           </Section>
 
           <Section title="Post FX Controls">
@@ -431,6 +511,14 @@ export default function App() {
               onValueChange={(v) => setScene((prev) => ({ ...prev, symmetrySegments: v }))}
               minimumTrackTintColor="#1ec9ff"
               maximumTrackTintColor="#3b3b3b"
+            />
+          </Section>
+
+          <Section title="Colorize">
+            <SegmentedOptionRow
+              options={ColorModes}
+              value={scene.colorMode}
+              onChange={(next) => setScene((prev) => ({ ...prev, colorMode: next as ColorMode }))}
             />
           </Section>
 
@@ -491,11 +579,34 @@ export default function App() {
 
           <View style={{ height: 28 }} />
         </ScrollView>
-      ) : (
-        <Pressable style={styles.showMenuButton} onPress={onFloatingButtonPress}>
-          <Text style={styles.btnText}>{floatingButtonLabel}</Text>
+      ) : null}
+
+      <Modal
+        visible={showCastOverlay}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCastOverlay(false)}
+      >
+        <Pressable style={styles.castModalBackdrop} onPress={() => setShowCastOverlay(false)}>
+          <Pressable style={styles.castModalCard} onPress={() => undefined}>
+            <Text style={styles.castModalTitle}>Send Visuals To Screen</Text>
+            <Text style={styles.meta}>Connected: {displayState.connected ? 'Yes' : 'No'}</Text>
+            <Text style={styles.meta}>Route: {displayState.routeName ?? 'None'}</Text>
+            <Text style={styles.meta}>Status: {displayState.message}</Text>
+            <View style={styles.buttonRow}>
+              <Pressable style={styles.btn} onPress={chooseOutputRoute}>
+                <Text style={styles.btnText}>Choose Route</Text>
+              </Pressable>
+              <Pressable style={styles.btn} onPress={startExternalOutput}>
+                <Text style={styles.btnText}>Start Output</Text>
+              </Pressable>
+              <Pressable style={styles.btnSecondary} onPress={stopExternalOutput}>
+                <Text style={styles.btnText}>Stop Output</Text>
+              </Pressable>
+            </View>
+          </Pressable>
         </Pressable>
-      )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -582,6 +693,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 11,
   },
+  btnSecondaryActive: {
+    backgroundColor: '#103345',
+    borderColor: '#1ec9ff',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 11,
+  },
   btnText: {
     color: 'white',
     fontSize: 12,
@@ -607,6 +726,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 2,
   },
+  optionWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  optionChip: {
+    backgroundColor: '#0b0d12',
+    borderColor: '#28313f',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  optionChipSelected: {
+    backgroundColor: '#103345',
+    borderColor: '#1ec9ff',
+  },
+  optionChipText: {
+    color: '#d4dbe7',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  optionChipTextSelected: {
+    color: '#ebfbff',
+  },
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -619,10 +763,25 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
-  showMenuButton: {
+  castOverlayButton: {
     position: 'absolute',
-    top: 56,
+    top: 16,
     right: 14,
+    zIndex: 50,
+    elevation: 6,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    borderColor: '#374253',
+    borderWidth: 1,
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  fullscreenOverlayButton: {
+    position: 'absolute',
+    right: 14,
+    bottom: 16,
     zIndex: 50,
     elevation: 6,
     backgroundColor: 'rgba(0,0,0,0.72)',
@@ -631,5 +790,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
+  },
+  overlayButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  castIconFrame: {
+    width: 18,
+    height: 14,
+  },
+  castIconBox: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 18,
+    height: 12,
+    borderWidth: 1.7,
+    borderColor: '#ffffff',
+    borderRadius: 1,
+  },
+  castIconWaveOuter: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: 10,
+    height: 10,
+    borderLeftWidth: 1.7,
+    borderTopWidth: 1.7,
+    borderColor: '#ffffff',
+    borderTopLeftRadius: 10,
+  },
+  castIconWaveInner: {
+    position: 'absolute',
+    left: 3,
+    bottom: 0,
+    width: 6,
+    height: 6,
+    borderLeftWidth: 1.7,
+    borderTopWidth: 1.7,
+    borderColor: '#ffffff',
+    borderTopLeftRadius: 6,
+  },
+  castIconDot: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#ffffff',
+  },
+  castModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  castModalCard: {
+    backgroundColor: '#0d0f14',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1c2230',
+    padding: 16,
+  },
+  castModalTitle: {
+    color: '#f4f6fb',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 10,
   },
 });

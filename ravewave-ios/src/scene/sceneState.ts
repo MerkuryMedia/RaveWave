@@ -63,14 +63,29 @@ export const PostEffects = [
   'X-Ray',
   'Hyperspace',
   'Bounce',
+  'Tunnel',
 ] as const;
 
 export type PostEffect = (typeof PostEffects)[number];
+
+export const ColorModes = [
+  'Blue',
+  'Green',
+  'Yellow',
+  'Red',
+  'Purple',
+  'Two-Tone',
+  'Rainbow',
+  'White',
+] as const;
+
+export type ColorMode = (typeof ColorModes)[number];
 
 export type SceneState = {
   sourceMode: SourceMode;
   enabledLayers: Set<VisualLayer>;
   enabledEffects: Set<PostEffect>;
+  colorMode: ColorMode;
   fxIntensity: number;
   speed: number;
   tileCount: number;
@@ -86,6 +101,7 @@ export const defaultSceneState = (): SceneState => ({
   sourceMode: SourceMode.Microphone,
   enabledLayers: new Set<VisualLayer>(['Spectrum', 'Waveform']),
   enabledEffects: new Set<PostEffect>(['Bloom Glow']),
+  colorMode: 'Rainbow',
   fxIntensity: 0.6,
   speed: 0.6,
   tileCount: 3,
@@ -102,6 +118,7 @@ export type PersistedPreset = {
   sourceMode: SourceMode;
   enabledLayers: VisualLayer[];
   enabledEffects: PostEffect[];
+  colorMode: ColorMode;
   fxIntensity: number;
   speed: number;
   tileCount: number;
@@ -113,6 +130,7 @@ export const toPersistedPreset = (name: string, scene: SceneState): PersistedPre
   sourceMode: scene.sourceMode,
   enabledLayers: [...scene.enabledLayers],
   enabledEffects: [...scene.enabledEffects],
+  colorMode: scene.colorMode,
   fxIntensity: scene.fxIntensity,
   speed: scene.speed,
   tileCount: scene.tileCount,
@@ -124,6 +142,7 @@ export const fromPersistedPreset = (preset: PersistedPreset): SceneState => ({
   sourceMode: preset.sourceMode,
   enabledLayers: new Set(preset.enabledLayers),
   enabledEffects: new Set(preset.enabledEffects),
+  colorMode: preset.colorMode ?? 'Rainbow',
   fxIntensity: preset.fxIntensity,
   speed: preset.speed ?? 0.6,
   tileCount: preset.tileCount,

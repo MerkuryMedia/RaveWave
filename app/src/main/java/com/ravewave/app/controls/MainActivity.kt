@@ -1,21 +1,26 @@
 package com.ravewave.app.controls
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.OpenableColumns
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.AppCompatRadioButton
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -27,6 +32,7 @@ import com.ravewave.app.R
 import com.ravewave.app.RaveWaveApplication
 import com.ravewave.app.databinding.ActivityMainBinding
 import com.ravewave.app.render.VisualizerSurfaceView
+import com.ravewave.app.scene.ColorMode
 import com.ravewave.app.scene.LayerCategory
 import com.ravewave.app.scene.PostEffect
 import com.ravewave.app.scene.SourceMode
@@ -43,8 +49,12 @@ class MainActivity : AppCompatActivity() {
 
     private val layerSwitches = mutableMapOf<VisualLayer, MaterialSwitch>()
     private val effectSwitches = mutableMapOf<PostEffect, MaterialSwitch>()
-
-    private var isMenuHidden = false
+    private val colorModeButtons = mutableMapOf<ColorMode, RadioButton>()
+    private val overlayHandler = Handler(Looper.getMainLooper())
+    private val hideOverlayRunnable = Runnable {
+        binding.castOverlayButton.visibility = View.GONE
+        binding.fullscreenOverlayButton.visibility = View.GONE
+    }
 
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -92,10 +102,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         previewSurface = VisualizerSurfaceView(this, app.analyzerEngine)
-        binding.renderHost.addView(previewSurface)
+        previewSurface.isClickable = true
+        previewSurface.setOnClickListener { revealOverlayControls() }
+        binding.renderHost.addView(previewSurface, 0)
+        binding.renderHost.setOnClickListener { revealOverlayControls() }
 
         setupLayerToggles()
         setupEffectToggles()
+        setupColorModes()
         setupUiActions()
         observeState()
     }
@@ -125,6 +139,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        overlayHandler.removeCallbacks(hideOverlayRunnable)
         super.onDestroy()
         externalSurface = null
     }
@@ -147,37 +162,14 @@ class MainActivity : AppCompatActivity() {
             viewModel.toggleFilePlayback()
         }
 
-        binding.fullscreenButton.setOnClickListener {
+        binding.fullscreenOverlayButton.setOnClickListener {
+            revealOverlayControls()
             viewModel.setFullscreen(!viewModel.uiState.value.scene.isFullscreen)
         }
 
-        binding.externalButton.setOnClickListener {
-            val enable = !viewModel.uiState.value.scene.isExternalVisualsEnabled
-            val activated = app.displaySessionManager.setExternalVisualsEnabled(enable, this) { context ->
-                VisualizerSurfaceView(context, app.analyzerEngine).also {
-                    externalSurface = it
-                    it.updateSceneState(viewModel.uiState.value.scene)
-                }
-            }
-            viewModel.setExternalVisualsEnabled(if (enable) activated else false)
-            if (!enable || !activated) externalSurface = null
-        }
-
-        binding.castButton.setOnClickListener {
-            val castState = viewModel.uiState.value.castState
-            if (castState.isConnected) {
-                viewModel.setCastMode(!viewModel.uiState.value.scene.isCastModeEnabled)
-            } else {
-                app.castController.showRouteChooser(this)
-            }
-        }
-
-        binding.hideMenuButton.setOnClickListener {
-            setMenuHidden(true)
-        }
-
-        binding.showMenuButton.setOnClickListener {
-            setMenuHidden(false)
+        binding.castOverlayButton.setOnClickListener {
+            revealOverlayControls()
+            showDisplayDialog()
         }
 
         binding.intensitySeek.setOnSeekBarChangeListener(SimpleSeekListener { value ->
@@ -196,18 +188,17 @@ class MainActivity : AppCompatActivity() {
             viewModel.setSymmetry(value)
         })
 
-        binding.savePresetButton.setOnClickListener {
-            viewModel.savePreset(binding.presetNameInput.text?.toString().orEmpty())
+        binding.randomizeButton.setOnClickListener {
+            viewModel.randomizeScene()
+            binding.statusText.text = "Scene randomized"
         }
 
-        binding.loadPresetButton.setOnClickListener {
-            val name = binding.presetNameInput.text?.toString().orEmpty().ifBlank {
-                viewModel.uiState.value.presetNames.firstOrNull().orEmpty()
-            }
-            if (!viewModel.loadPreset(name)) {
-                binding.statusText.text = "Preset not found"
-            }
+        binding.evolveButton.setOnClickListener {
+            val next = !viewModel.uiState.value.isEvolving
+            viewModel.setEvolveEnabled(next)
+            if (!next) binding.statusText.text = "Evolve disabled"
         }
+
     }
 
     private fun observeState() {
@@ -246,6 +237,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupColorModes() {
+        for (mode in ColorMode.entries) {
+            val button = AppCompatRadioButton(this).apply {
+                id = View.generateViewId()
+                text = mode.displayName
+                textSize = 13f
+                setTextColor(ContextCompat.getColor(context, R.color.rw_text))
+            }
+            colorModeButtons[mode] = button
+            binding.colorModeGroup.addView(button)
+        }
+        binding.colorModeGroup.setOnCheckedChangeListener { _: RadioGroup, checkedId: Int ->
+            if (checkedId == View.NO_ID) return@setOnCheckedChangeListener
+            val mode = colorModeButtons.entries.firstOrNull { it.value.id == checkedId }?.key ?: return@setOnCheckedChangeListener
+            viewModel.setColorMode(mode)
+        }
+    }
+
     private fun addLayerGroup(container: LinearLayout, category: LayerCategory) {
         val layers = VisualLayer.entries.filter { it.category == category }
         for (layer in layers) {
@@ -277,6 +286,10 @@ class MainActivity : AppCompatActivity() {
             val checked = ui.scene.enabledEffects.contains(effect)
             if (toggle.isChecked != checked) toggle.isChecked = checked
         }
+        val selectedColorId = colorModeButtons[ui.scene.colorMode]?.id ?: View.NO_ID
+        if (binding.colorModeGroup.checkedRadioButtonId != selectedColorId) {
+            binding.colorModeGroup.check(selectedColorId)
+        }
     }
 
     private fun syncSliders(ui: ControlUiState) {
@@ -302,21 +315,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun syncButtons(ui: ControlUiState) {
-        binding.castButton.text = if (ui.castState.isConnected) {
-            if (ui.scene.isCastModeEnabled) "Cast: Sync On" else "Cast: Sync Off"
-        } else {
-            getString(R.string.cast)
-        }
-
-        binding.externalButton.text = if (ui.scene.isExternalVisualsEnabled) {
-            "External: On"
-        } else {
-            getString(R.string.external_display)
-        }
-
-        if (ui.scene.activePresetName != null && binding.presetNameInput.text.isNullOrBlank()) {
-            binding.presetNameInput.setText(ui.scene.activePresetName)
-        }
+        binding.evolveButton.text = if (ui.isEvolving) "Evolve: On" else "Evolve: Off"
+        binding.fullscreenOverlayButton.text = if (ui.scene.isFullscreen) "Exit Fullscreen" else "Fullscreen"
     }
 
     private fun startMicrophoneMode() {
@@ -336,10 +336,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setMenuHidden(hidden: Boolean) {
-        isMenuHidden = hidden
-        binding.controlsScroll.visibility = if (hidden) View.GONE else View.VISIBLE
-        binding.showMenuButton.visibility = if (hidden) View.VISIBLE else View.GONE
+    private fun revealOverlayControls() {
+        binding.castOverlayButton.visibility = View.VISIBLE
+        binding.fullscreenOverlayButton.visibility = View.VISIBLE
+        overlayHandler.removeCallbacks(hideOverlayRunnable)
+        overlayHandler.postDelayed(hideOverlayRunnable, 3200L)
+    }
+
+    private fun showDisplayDialog() {
+        val ui = viewModel.uiState.value
+        val message = buildString {
+            append("Connected: ")
+            append(if (ui.castState.isConnected) "Cast ready" else "Not casting")
+            append('\n')
+            append("External: ")
+            append(ui.externalDisplayState.message)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Send Visuals To Screen")
+            .setMessage(message)
+            .setPositiveButton("Cast Route") { _, _ ->
+                app.castController.showRouteChooser(this)
+            }
+            .setNeutralButton(
+                if (ui.scene.isExternalVisualsEnabled) "Stop Output" else "Start Output"
+            ) { _, _ ->
+                val enable = !viewModel.uiState.value.scene.isExternalVisualsEnabled
+                val activated = app.displaySessionManager.setExternalVisualsEnabled(enable, this) { context ->
+                    VisualizerSurfaceView(context, app.analyzerEngine).also {
+                        externalSurface = it
+                        it.updateSceneState(viewModel.uiState.value.scene)
+                    }
+                }
+                viewModel.setExternalVisualsEnabled(if (enable) activated else false)
+                if (!enable || !activated) externalSurface = null
+            }
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun applyFullscreen(enabled: Boolean) {
@@ -355,6 +389,7 @@ class MainActivity : AppCompatActivity() {
             val lp = binding.renderHost.layoutParams
             lp.height = LinearLayout.LayoutParams.MATCH_PARENT
             binding.renderHost.layoutParams = lp
+            binding.controlsScroll.visibility = View.GONE
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             controller.show(WindowInsetsCompat.Type.systemBars())
@@ -362,6 +397,7 @@ class MainActivity : AppCompatActivity() {
             val lp = binding.renderHost.layoutParams
             lp.height = resources.getDimensionPixelSize(R.dimen.preview_height)
             binding.renderHost.layoutParams = lp
+            binding.controlsScroll.visibility = View.VISIBLE
         }
     }
 

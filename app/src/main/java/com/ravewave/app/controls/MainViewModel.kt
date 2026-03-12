@@ -7,29 +7,38 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.cast.framework.CastSession
 import com.ravewave.app.RaveWaveApplication
+import com.ravewave.app.scene.ColorMode
 import com.ravewave.app.scene.PostEffect
+import com.ravewave.app.scene.SceneRandomizer
 import com.ravewave.app.scene.SourceMode
 import com.ravewave.app.scene.VisualLayer
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as RaveWaveApplication
 
     private val presetNames = MutableStateFlow(app.sceneRepository.listPresetNames())
+    private val evolveEnabled = MutableStateFlow(false)
+    private var evolveJob: Job? = null
+    private var evolvePulseState = SceneRandomizer.EvolvePulseState()
 
     val uiState: StateFlow<ControlUiState> = combine(
         app.sceneRepository.state,
         app.audioSourceManager.status,
         app.castController.uiState,
         app.displaySessionManager.state,
-        app.analyzerEngine.metrics
-    ) { scene, source, cast, display, metrics ->
-        Quintuple(scene, source, cast, display, metrics)
+        app.analyzerEngine.metrics,
+        evolveEnabled
+    ) { scene, source, cast, display, metrics, evolving ->
+        Sextuple(scene, source, cast, display, metrics, evolving)
     }.combine(presetNames) { core, presets ->
         ControlUiState(
             scene = core.first,
@@ -37,7 +46,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             castState = core.third,
             externalDisplayState = core.fourth,
             analyzerMetrics = core.fifth,
-            presetNames = presets
+            presetNames = presets,
+            isEvolving = core.sixth
         )
     }.stateIn(
         scope = viewModelScope,
@@ -48,7 +58,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             castState = app.castController.uiState.value,
             externalDisplayState = app.displaySessionManager.state.value,
             analyzerMetrics = app.analyzerEngine.metrics.value,
-            presetNames = presetNames.value
+            presetNames = presetNames.value,
+            isEvolving = evolveEnabled.value
         )
     )
 
@@ -104,6 +115,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         app.sceneRepository.setSpeed(progress0to100 / 100f)
     }
 
+    fun setColorMode(mode: ColorMode) {
+        app.sceneRepository.setColorMode(mode)
+    }
+
+    fun randomizeScene() {
+        app.sceneRepository.updateScene { SceneRandomizer.randomizeScene(it) }
+    }
+
+    fun setEvolveEnabled(enabled: Boolean) {
+        if (evolveEnabled.value == enabled) return
+        evolveEnabled.value = enabled
+        evolveJob?.cancel()
+        if (!enabled) return
+
+        app.sceneRepository.updateScene { SceneRandomizer.randomizeScene(it) }
+        evolvePulseState = SceneRandomizer.EvolvePulseState()
+        evolveJob = viewModelScope.launch {
+            while (isActive) {
+                val metrics = app.analyzerEngine.metrics.value
+                delay(SceneRandomizer.nextEvolveDelayMs(metrics))
+                val liveMetrics = app.analyzerEngine.metrics.value
+                app.sceneRepository.updateScene {
+                    SceneRandomizer.evolveSceneWithAudio(it, liveMetrics, evolvePulseState)
+                }
+            }
+        }
+    }
+
     fun setTileCount(progress: Int) {
         app.sceneRepository.setTileCount(progress + 2)
     }
@@ -137,11 +176,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return loaded
     }
 
-    private data class Quintuple<A, B, C, D, E>(
+    private data class Sextuple<A, B, C, D, E, F>(
         val first: A,
         val second: B,
         val third: C,
         val fourth: D,
-        val fifth: E
+        val fifth: E,
+        val sixth: F
     )
 }

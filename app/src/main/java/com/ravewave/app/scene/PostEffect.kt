@@ -24,5 +24,6 @@ enum class PostEffect(val displayName: String, val index: Int) {
     NEON("Neon", 20),
     X_RAY("X-Ray", 21),
     HYPERSPACE("Hyperspace", 22),
-    BOUNCE("Bounce", 23)
+    BOUNCE("Bounce", 23),
+    TUNNEL("Tunnel", 24)
 }

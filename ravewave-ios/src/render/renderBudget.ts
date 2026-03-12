@@ -55,6 +55,7 @@ const EFFECT_LOAD: Partial<Record<PostEffect, number>> = {
   'X-Ray': 1.15,
   Hyperspace: 1.3,
   Bounce: 0.55,
+  Tunnel: 1.1,
 };
 
 const getLayerCategory = (layer: VisualLayer): string => {

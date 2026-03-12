@@ -12,5 +12,6 @@ data class ControlUiState(
     val castState: CastUiState,
     val externalDisplayState: ExternalDisplayState,
     val analyzerMetrics: AnalyzerMetrics,
-    val presetNames: List<String>
+    val presetNames: List<String>,
+    val isEvolving: Boolean
 )

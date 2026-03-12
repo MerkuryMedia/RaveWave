@@ -70,6 +70,7 @@ object RenderBudget {
         PostEffect.X_RAY -> 1.15f
         PostEffect.HYPERSPACE -> 1.3f
         PostEffect.BOUNCE -> 0.55f
+        PostEffect.TUNNEL -> 1.1f
         else -> 0.25f
     }
 

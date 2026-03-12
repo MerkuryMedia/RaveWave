@@ -25,6 +25,7 @@ export type DisplayFramePayload = {
   scene: {
     enabledLayers: string[];
     enabledEffects: string[];
+    colorMode: string;
     fxIntensity: number;
     speed: number;
     tileCount: number;

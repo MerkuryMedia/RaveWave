@@ -163,6 +163,7 @@ export class DisplaySessionManager {
       scene: {
         enabledLayers: [...scene.enabledLayers],
         enabledEffects: [...scene.enabledEffects],
+        colorMode: scene.colorMode,
         fxIntensity: scene.fxIntensity,
         speed: scene.speed,
         tileCount: scene.tileCount,
