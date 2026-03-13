@@ -22,7 +22,7 @@ Detailed iPhone docs:
 
 ## Build
 
-1. Open `F:\Code\RaveWave` in Android Studio (Ladybug+ with AGP 8.7+).
+1. Open `RaveWave` in Android Studio (Ladybug+ with AGP 8.7+).
 2. Let Gradle sync.
 3. Run `app` on an Android 10+ device.
 4. Grant microphone permission for mic mode.
@@ -36,7 +36,7 @@ CLI install to connected USB device:
 - `powershell -ExecutionPolicy Bypass -File .\scripts\install-debug.ps1`
 
 Desktop test (Android Emulator):
-- One-time (if accel check fails): `powershell -ExecutionPolicy Bypass -File .\scripts\install-hypervisor-driver.ps1`
+- One-time (if acceleration check fails): `powershell -ExecutionPolicy Bypass -File .\scripts\install-hypervisor-driver.ps1`
 - Start emulator: `powershell -ExecutionPolicy Bypass -File .\scripts\start-emulator.ps1`
 - Install app to emulator: `powershell -ExecutionPolicy Bypass -File .\scripts\install-emulator.ps1`
 - One-command flow (build + start emulator + install + launch): `powershell -ExecutionPolicy Bypass -File .\scripts\test-desktop.ps1`
