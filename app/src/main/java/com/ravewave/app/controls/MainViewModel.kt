@@ -7,9 +7,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.cast.framework.CastSession
 import com.ravewave.app.RaveWaveApplication
+import com.ravewave.app.analyzer.AnalyzerMetrics
+import com.ravewave.app.audio.AudioSourceStatus
+import com.ravewave.app.cast.CastUiState
+import com.ravewave.app.display.ExternalDisplayState
 import com.ravewave.app.scene.ColorMode
 import com.ravewave.app.scene.PostEffect
 import com.ravewave.app.scene.SceneRandomizer
+import com.ravewave.app.scene.SceneState
 import com.ravewave.app.scene.SourceMode
 import com.ravewave.app.scene.VisualLayer
 import kotlinx.coroutines.Job
@@ -36,18 +41,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         app.castController.uiState,
         app.displaySessionManager.state,
         app.analyzerEngine.metrics,
-        evolveEnabled
-    ) { scene, source, cast, display, metrics, evolving ->
-        Sextuple(scene, source, cast, display, metrics, evolving)
-    }.combine(presetNames) { core, presets ->
+        evolveEnabled,
+        presetNames
+    ) { flows ->
         ControlUiState(
-            scene = core.first,
-            sourceStatus = core.second,
-            castState = core.third,
-            externalDisplayState = core.fourth,
-            analyzerMetrics = core.fifth,
-            presetNames = presets,
-            isEvolving = core.sixth
+            scene = flows[0] as SceneState,
+            sourceStatus = flows[1] as AudioSourceStatus,
+            castState = flows[2] as CastUiState,
+            externalDisplayState = flows[3] as ExternalDisplayState,
+            analyzerMetrics = flows[4] as AnalyzerMetrics,
+            isEvolving = flows[5] as Boolean,
+            presetNames = flows[6] as List<String>
         )
     }.stateIn(
         scope = viewModelScope,
