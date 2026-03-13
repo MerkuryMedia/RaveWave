@@ -8,6 +8,7 @@ import com.ravewave.app.scene.SourceMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 class AudioSourceManager(
     context: Context,
@@ -48,10 +49,12 @@ class AudioSourceManager(
         selectedFileUri = uri
         selectedFileName = displayName ?: uri.lastPathSegment ?: "Selected file"
         fileSource.setFile(uri)
-        _status.value = _status.value.copy(
-            selectedFileName = selectedFileName,
-            message = "File loaded"
-        )
+        _status.update {
+            it.copy(
+                selectedFileName = selectedFileName,
+                message = "File loaded"
+            )
+        }
     }
 
     fun switchToMicrophone() {
@@ -60,7 +63,7 @@ class AudioSourceManager(
 
     fun switchToFilePlayback() {
         if (selectedFileUri == null) {
-            _status.value = _status.value.copy(message = "Select an audio file first")
+            _status.update { it.copy(message = "Select an audio file first") }
             return
         }
         runSwitch(fileSource, SourceMode.FILE, "File playback active")
@@ -80,10 +83,12 @@ class AudioSourceManager(
 
     fun toggleFilePlayback() {
         fileSource.togglePlayback()
-        _status.value = _status.value.copy(
-            isPlaying = fileSource.isPlaying(),
-            message = if (fileSource.isPlaying()) "Playback running" else "Playback paused"
-        )
+        _status.update {
+            it.copy(
+                isPlaying = fileSource.isPlaying(),
+                message = if (fileSource.isPlaying()) "Playback running" else "Playback paused"
+            )
+        }
     }
 
     fun release() {
@@ -99,7 +104,7 @@ class AudioSourceManager(
 
     private fun runSwitch(source: AudioSource?, mode: SourceMode, successMessage: String) {
         if (source == null) {
-            _status.value = _status.value.copy(message = "Source unavailable")
+            _status.update { it.copy(message = "Source unavailable") }
             return
         }
 
@@ -110,19 +115,23 @@ class AudioSourceManager(
             }
             source.start()
 
-            _status.value = AudioSourceStatus(
-                activeMode = mode,
-                isRunning = true,
-                isPlaying = fileSource.isPlaying(),
-                selectedFileName = selectedFileName,
-                message = successMessage
-            )
+            _status.update {
+                AudioSourceStatus(
+                    activeMode = mode,
+                    isRunning = true,
+                    isPlaying = fileSource.isPlaying(),
+                    selectedFileName = selectedFileName,
+                    message = successMessage
+                )
+            }
         } catch (t: Throwable) {
-            _status.value = _status.value.copy(
-                activeMode = mode,
-                isRunning = false,
-                message = t.message ?: "Failed to start source"
-            )
+            _status.update {
+                it.copy(
+                    activeMode = mode,
+                    isRunning = false,
+                    message = t.message ?: "Failed to start source"
+                )
+            }
         }
     }
 }

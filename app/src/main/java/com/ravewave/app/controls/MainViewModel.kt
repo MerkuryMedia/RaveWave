@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -44,6 +45,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         evolveEnabled,
         presetNames
     ) { flows ->
+        @Suppress("UNCHECKED_CAST")
         ControlUiState(
             scene = flows[0] as SceneState,
             sourceStatus = flows[1] as AudioSourceStatus,
@@ -129,7 +131,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setEvolveEnabled(enabled: Boolean) {
         if (evolveEnabled.value == enabled) return
-        evolveEnabled.value = enabled
+        evolveEnabled.update { enabled }
         evolveJob?.cancel()
         if (!enabled) return
 
@@ -169,23 +171,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun savePreset(name: String) {
         app.sceneRepository.savePreset(name)
-        presetNames.value = app.sceneRepository.listPresetNames()
+        presetNames.update { app.sceneRepository.listPresetNames() }
     }
 
     fun loadPreset(name: String): Boolean {
         val loaded = app.sceneRepository.loadPreset(name)
         if (loaded) {
-            presetNames.value = app.sceneRepository.listPresetNames()
+            presetNames.update { app.sceneRepository.listPresetNames() }
         }
         return loaded
     }
-
-    private data class Sextuple<A, B, C, D, E, F>(
-        val first: A,
-        val second: B,
-        val third: C,
-        val fourth: D,
-        val fifth: E,
-        val sixth: F
-    )
 }

@@ -22,7 +22,7 @@ Detailed iPhone docs:
 
 ## Build
 
-1. Open `C:\Servers\RaveWave` in Android Studio (Hedgehog+ with AGP 8.4+).
+1. Open `F:\Code\RaveWave` in Android Studio (Ladybug+ with AGP 8.7+).
 2. Let Gradle sync.
 3. Run `app` on an Android 10+ device.
 4. Grant microphone permission for mic mode.
@@ -58,19 +58,19 @@ Primary packages:
 ## Source Modes
 
 1. Microphone
-- Uses `AudioRecord` mono PCM path.
-- Runtime permission: `RECORD_AUDIO`.
-- Fast stop/start source switching via `AudioSourceManager`.
+    - Uses `AudioRecord` mono PCM path.
+    - Runtime permission: `RECORD_AUDIO`.
+    - Fast stop/start source switching via `AudioSourceManager`.
 
 2. File playback (in-app)
-- Uses Media3 ExoPlayer for playback.
-- File selected with `OpenDocument`.
-- Audio-reactive feed from ExoPlayer audio session using `Visualizer` callback.
+    - Uses Media3 ExoPlayer for playback.
+    - File selected with `OpenDocument`.
+    - Audio-reactive feed from ExoPlayer audio session using `Visualizer` callback.
 
 3. Playback capture (supported devices/apps)
-- Uses `MediaProjection` + `AudioPlaybackCaptureConfiguration` + `AudioRecord`.
-- Consent flow handled in controller activity.
-- Fails gracefully when capture is not available/allowed.
+    - Uses `MediaProjection` + `AudioPlaybackCaptureConfiguration` + `AudioRecord`.
+    - Consent flow handled in controller activity.
+    - Fails gracefully when capture is not available/allowed.
 
 All source types normalize to the analyzer input (`submitPcm`) and produce a shared reactive model.
 

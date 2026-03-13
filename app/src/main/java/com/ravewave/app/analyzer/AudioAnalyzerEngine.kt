@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -155,18 +156,20 @@ class AudioAnalyzerEngine(
         decayMod = smooth(decayMod, abs(energyDelta.coerceAtMost(0f)) * 2f, 0.18f)
 
         frameIndex += 1
-        _metrics.value = AnalyzerMetrics(
-            frameIndex = frameIndex,
-            bass = smoothedBass,
-            mids = smoothedMids,
-            highs = smoothedHighs,
-            energy = smoothedEnergy,
-            onsetPulse = onsetEnvelope.coerceIn(0f, 1f),
-            beatPulse = beatEnvelope.coerceIn(0f, 1f),
-            peakHold = peakHold.coerceIn(0f, 1f),
-            attackMod = attackMod.coerceIn(0f, 1f),
-            decayMod = decayMod.coerceIn(0f, 1f)
-        )
+        _metrics.update {
+            AnalyzerMetrics(
+                frameIndex = frameIndex,
+                bass = smoothedBass,
+                mids = smoothedMids,
+                highs = smoothedHighs,
+                energy = smoothedEnergy,
+                onsetPulse = onsetEnvelope.coerceIn(0f, 1f),
+                beatPulse = beatEnvelope.coerceIn(0f, 1f),
+                peakHold = peakHold.coerceIn(0f, 1f),
+                attackMod = attackMod.coerceIn(0f, 1f),
+                decayMod = decayMod.coerceIn(0f, 1f)
+            )
+        }
     }
 
     private fun normalizeBinsInPlace() {
